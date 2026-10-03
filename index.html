@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulation Cigarette Interactive</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            overflow-x: hidden;
+            touch-action: manipulation;
+        }
+        .glow-red {
+            box-shadow: 0 0 25px rgba(239, 68, 68, 0.8), 0 0 50px rgba(249, 115, 22, 0.5);
+        }
+        .glow-orange {
+            box-shadow: 0 0 15px rgba(249, 115, 22, 0.6);
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col justify-between select-none">
+
+    <!-- Modal d'Avertissement Santé -->
+    <div id="warning-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 transition-opacity duration-300">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 md:p-8 shadow-2xl relative overflow-hidden flex flex-col space-y-6">
+            
+            <!-- Bouton de changement de langue -->
+            <div class="flex justify-between items-center border-b border-slate-800 pb-4">
+                <div class="flex items-center space-x-2">
+                    <span class="text-2xl">⚠️</span>
+                    <h2 id="modal-title" class="font-bold text-lg text-red-400">Avertissement Sanitaire Important</h2>
+                </div>
+                <button id="btn-lang-switch" class="bg-slate-800 hover:bg-slate-700 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-700 text-slate-300 transition flex items-center space-x-1">
+                    <span>🌐</span>
+                    <span id="lang-label">English</span>
+                </button>
+            </div>
+
+            <!-- Contenu textuel de l'avertissement -->
+            <div class="space-y-4 text-slate-300 text-sm md:text-base leading-relaxed">
+                <p id="modal-text-1">
+                    Cette application est une <strong class="text-white">simulation virtuelle</strong> à des fins de divertissement uniquement. Elle ne fait en aucun cas l'apologie du tabagisme.
+                </p>
+                <div class="bg-red-500/10 border-l-4 border-red-500 p-4 rounded-r-xl space-y-2">
+                    <p id="modal-text-2" class="font-medium text-red-300">
+                        Le tabagisme nuit gravement à la santé :
+                    </p>
+                    <ul id="modal-list" class="list-disc list-inside space-y-1 text-xs md:text-sm text-slate-300">
+                        <li>Risques accrus de cancers (poumons, gorge, etc.)</li>
+                        <li>Maladies cardiovasculaires et accidents vasculaires cérébraux (AVC)</li>
+                        <li>Forte dépendance physique et psychologique (nicotine)</li>
+                        <li>Altération des capacités respiratoires</li>
+                    </ul>
+                </div>
+                <p id="modal-text-3" class="text-xs text-slate-400 italic">
+                    Si vous fumez et souhaitez arrêter, parlez-en à un professionnel de santé ou appelez tabac info service.
+                </p>
+            </div>
+
+            <!-- Bouton d'acceptation -->
+            <button id="btn-accept-warning" class="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-semibold py-3.5 px-6 rounded-2xl shadow-lg shadow-orange-500/20 transition transform active:scale-95 text-center">
+                <span id="modal-btn-text">J'ai compris et je continue</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Header principal -->
+    <header class="w-full p-4 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 flex justify-between items-center z-20">
+        <div class="flex items-center space-x-2">
+            <span class="text-2xl">🚬</span>
+            <h1 id="app-title" class="font-bold text-lg tracking-wide bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">VirtuSmoke</h1>
+        </div>
+        <div class="flex items-center space-x-4">
+            <div class="bg-slate-800/80 border border-slate-700 px-3 py-1.5 rounded-full text-xs flex items-center space-x-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" id="mic-status-dot"></span>
+                <span id="mic-status-text" class="text-slate-300">Micro inactif</span>
+            </div>
+            <button id="btn-toggle-sound" class="bg-slate-800 hover:bg-slate-700 p-2 rounded-full text-slate-300 transition text-sm" title="Activer les sons">
+                🔊
+            </button>
+        </div>
+    </header>
+
+    <main class="relative flex-1 flex flex-col items-center justify-center p-4">
+        <!-- Canvas pour la fumée et les particules -->
+        <canvas id="smokeCanvas" class="absolute inset-0 w-full h-full pointer-events-none z-10"></canvas>
+
+        <!-- Container principal de la cigarette -->
+        <div id="cigarette-container" class="relative w-full max-w-md h-64 flex items-center justify-center cursor-pointer z-0 transition-transform duration-300">
+            <!-- SVG Cigarette hyper réaliste -->
+            <svg id="cigarette-svg" viewBox="0 0 600 120" class="w-full drop-shadow-2xl transition-all duration-300">
+                <defs>
+                    <linearGradient id="filterGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stop-color="#d97706" />
+                        <stop offset="50%" stop-color="#b45309" />
+                        <stop offset="100%" stop-color="#92400e" />
+                    </linearGradient>
+                    <linearGradient id="paperGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stop-color="#f8fafc" />
+                        <stop offset="50%" stop-color="#e2e8f0" />
+                        <stop offset="100%" stop-color="#cbd5e1" />
+                    </linearGradient>
+                    <linearGradient id="ashGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stop-color="#475569" />
+                        <stop offset="50%" stop-color="#334155" />
+                        <stop offset="100%" stop-color="#1e293b" />
+                    </linearGradient>
+                    <pattern id="corkPattern" width="10" height="10" patternUnits="userSpaceOnUse">
+                        <rect width="10" height="10" fill="#b45309"/>
+                        <circle cx="3" cy="3" r="1.5" fill="#92400e" opacity="0.6"/>
+                        <circle cx="8" cy="7" r="1" fill="#d97706" opacity="0.7"/>
+                    </pattern>
+                </defs>
+
+                <rect x="50" y="55" width="500" height="30" rx="15" fill="rgba(0,0,0,0.4)" filter="blur(10px)" />
+
+                <g id="cigarette-body">
+                    <rect x="50" y="35" width="130" height="50" rx="4" fill="url(#corkPattern)" stroke="#78350f" stroke-width="1.5" />
+                    <line x1="180" y1="35" x2="180" y2="85" stroke="#78350f" stroke-width="2" stroke-dasharray="2,2" />
+                    <rect id="paper-rect" x="180" y="35" width="340" height="50" rx="2" fill="url(#paperGrad)" stroke="#94a3b8" stroke-width="1" />
+                    <line x1="240" y1="35" x2="240" y2="85" stroke="#cbd5e1" stroke-width="0.5" opacity="0.5"/>
+                    <line x1="320" y1="35" x2="320" y2="85" stroke="#cbd5e1" stroke-width="0.5" opacity="0.5"/>
+                    <line x1="400" y1="35" x2="400" y2="85" stroke="#cbd5e1" stroke-width="0.5" opacity="0.5"/>
+                    <line x1="480" y1="35" x2="480" y2="85" stroke="#cbd5e1" stroke-width="0.5" opacity="0.5"/>
+                </g>
+
+                <g id="tip-group" transform="translate(520, 35)">
+                    <path id="ash-path" d="M0,0 L20,5 L25,25 L20,45 L0,50 Z" fill="url(#ashGrad)" />
+                    <path id="coal-path" d="M20,5 L35,12 L38,25 L35,38 L20,45 Z" fill="#ef4444" opacity="0.3" />
+                </g>
+            </svg>
+        </div>
+
+        <div class="mt-6 text-center z-20">
+            <p id="instruction-text" class="text-slate-400 text-sm font-medium animate-pulse">
+                Cliquez pour allumer la cigarette 🖱️ ou soufflez sur votre micro 🎤
+            </p>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 w-full max-w-md mt-6 z-20">
+            <div class="bg-slate-900/90 border border-slate-800 p-3 rounded-2xl text-center shadow-lg">
+                <div id="label-puffs" class="text-xs text-slate-400 mb-1">Bouffées</div>
+                <div id="puff-count" class="text-xl font-bold text-orange-400">0</div>
+            </div>
+            <div class="bg-slate-900/90 border border-slate-800 p-3 rounded-2xl text-center shadow-lg">
+                <div id="label-length" class="text-xs text-slate-400 mb-1">Longueur</div>
+                <div id="length-val" class="text-xl font-bold text-slate-200">100%</div>
+            </div>
+            <div class="bg-slate-900/90 border border-slate-800 p-3 rounded-2xl text-center shadow-lg">
+                <div id="label-state" class="text-xs text-slate-400 mb-1">État</div>
+                <div id="state-val" class="text-xl font-bold text-red-400">Éteinte</div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="w-full p-4 bg-slate-900/90 backdrop-blur-md border-t border-slate-800 flex flex-wrap items-center justify-center gap-3 z-20">
+        <button id="btn-ignite" class="flex-1 min-w-[120px] bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-medium py-3 px-4 rounded-xl shadow-lg shadow-orange-500/20 transition transform active:scale-95 flex items-center justify-center space-x-2">
+            <span>🔥</span>
+            <span id="btn-ignite-text">Allumer</span>
+        </button>
+
+        <button id="btn-puff" class="flex-1 min-w-[120px] bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium py-3 px-4 rounded-xl shadow-lg transition transform active:scale-95 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+            <span>💨</span>
+            <span id="btn-puff-text">Tirer une bouffée</span>
+        </button>
+
+        <button id="btn-mic" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium py-3 px-4 rounded-xl shadow-lg transition transform active:scale-95 flex items-center justify-center space-x-2" title="Activer/Désactiver le micro pour souffler">
+            <span>🎙️</span>
+            <span id="btn-mic-text">Activer micro</span>
+        </button>
+
+        <button id="btn-reset" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-medium py-3 px-4 rounded-xl shadow-lg transition transform active:scale-95 flex items-center justify-center space-x-2">
+            <span>🔄</span>
+            <span id="btn-reset-text">Refaire</span>
+        </button>
+    </footer>
+
+    <script>
+        // Dictionnaire des langues pour l'avertissement et l'UI
+        const translations = {
+            fr: {
+                modalTitle: "Avertissement Sanitaire Important",
+                modalText1: "Cette application est une <strong>simulation virtuelle</strong> à des fins de divertissement uniquement. Elle ne fait en aucun cas l'apologie du tabagisme.",
+                modalText2: "Le tabagisme nuit gravement à la santé :",
+                modalList: `
+                    <li>Risques accrus de cancers (poumons, gorge, etc.)</li>
+                    <li>Maladies cardiovasculaires et accidents vasculaires cérébraux (AVC)</li>
+                    <li>Forte dépendance physique et psychologique (nicotine)</li>
+                    <li>Altération des capacités respiratoires</li>
+                `,
+                modalText3: "Si vous fumez et souhaitez arrêter, parlez-en à un professionnel de santé ou appelez un service d'aide.",
+                modalBtn: "J'ai compris et je continue",
+                langLabel: "English",
+                micInactive: "Micro inactif",
+                micActiveText: "Micro actif (Soufflez !)",
+                instructionOff: "Cliquez pour allumer la cigarette 🖱️ ou soufflez sur votre micro 🎤",
+                instructionOn: "Tirez des bouffées ou soufflez pour fumer !",
+                instructionDone: "Cigarette consumée. Cliquez sur Refaire.",
+                puffs: "Bouffées",
+                length: "Longueur",
+                state: "État",
+                stateOff: "Éteinte",
+                stateOn: "Allumée",
+                stateDone: "Finie",
+                btnIgnite: "Allumer",
+                btnExtinguish: "Éteindre",
+                btnPuff: "Tirer une bouffée",
+                btnMic: "Activer micro",
+                btnMicStop: "Couper micro",
+                btnReset: "Refaire"
+            },
+            en: {
+                modalTitle: "Important Health Warning",
+                modalText1: "This application is a <strong>virtual simulation</strong> for entertainment purposes only. It does not promote smoking in any way.",
+                modalText2: "Smoking seriously harms health:",
+                modalList: `
+                    <li>Increased risks of cancer (lungs, throat, etc.)</li>
+                    <li>Cardiovascular diseases and strokes</li>
+                    <li>Severe physical and psychological addiction (nicotine)</li>
+                    <li>Impaired respiratory capacity</li>
+                `,
+                modalText3: "If you smoke and want to quit, please consult a healthcare professional.",
+                modalBtn: "I understand and wish to proceed",
+                langLabel: "Français",
+                micInactive: "Mic inactive",
+                micActiveText: "Mic active (Blow into it!)",
+                instructionOff: "Click to light the cigarette 🖱️ or blow into your mic 🎤",
+                instructionOn: "Take puffs or blow to smoke!",
+                instructionDone: "Cigarette consumed. Click Reset.",
+                puffs: "Puffs",
+                length: "Length",
+                state: "State",
+                stateOff: "Off",
+                stateOn: "Lit",
+                stateDone: "Finished",
+                btnIgnite: "Light up",
+                btnExtinguish: "Put out",
+                btnPuff: "Take a puff",
+                btnMic: "Enable mic",
+                btnMicStop: "Stop mic",
+                btnReset: "Reset"
+            }
+        };
+
+        let currentLang = 'fr';
+
+        function updateLanguage(lang) {
+            currentLang = lang;
+            const t = translations[lang];
+
+            document.getElementById('modal-title').textContent = t.modalTitle;
+            document.getElementById('modal-text-1').innerHTML = t.modalText1;
+            document.getElementById('modal-text-2').textContent = t.modalText2;
+            document.getElementById('modal-list').innerHTML = t.modalList;
+            document.getElementById('modal-text-3').textContent = t.modalText3;
+            document.getElementById('modal-btn-text').textContent = t.modalBtn;
+            document.getElementById('lang-label').textContent = t.langLabel;
+
+            document.getElementById('label-puffs').textContent = t.puffs;
+            document.getElementById('label-length').textContent = t.length;
+            document.getElementById('label-state').textContent = t.state;
+            
+            document.getElementById('btn-reset-text').textContent = t.btnReset;
+            document.getElementById('btn-puff-text').textContent = t.btnPuff;
+
+            if (!micActive) {
+                document.getElementById('mic-status-text').textContent = t.micInactive;
+                document.getElementById('btn-mic-text').textContent = t.btnMic;
+            } else {
+                document.getElementById('mic-status-text').textContent = t.micActiveText;
+                document.getElementById('btn-mic-text').textContent = t.btnMicStop;
+            }
+
+            if (!isLit && cigaretteLength === 100) {
+                document.getElementById('instruction-text').textContent = t.instructionOff;
+                document.getElementById('state-val').textContent = t.stateOff;
+                document.getElementById('btn-ignite-text').textContent = t.btnIgnite;
+            } else if (isLit) {
+                document.getElementById('instruction-text').textContent = t.instructionOn;
+                document.getElementById('state-val').textContent = t.stateOn;
+                document.getElementById('btn-ignite-text').textContent = t.btnExtinguish;
+            } else if (cigaretteLength <= 0) {
+                document.getElementById('instruction-text').textContent = t.instructionDone;
+                document.getElementById('state-val').textContent = t.stateDone;
+            }
+        }
+
+        document.getElementById('btn-lang-switch').addEventListener('click', () => {
+            updateLanguage(currentLang === 'fr' ? 'en' : 'fr');
+        });
+
+        document.getElementById('btn-accept-warning').addEventListener('click', () => {
+            const modal = document.getElementById('warning-modal');
+            modal.style.opacity = '0';
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 300);
+        });
+
+        const canvas = document.getElementById('smokeCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let isLit = false;
+        let cigaretteLength = 100;
+        let puffCount = 0;
+        let soundEnabled = false;
+        let micActive = false;
+        let audioContext = null;
+        let analyser = null;
+        let microphoneStream = null;
+        let isPuffing = false;
+        
+        const btnIgnite = document.getElementById('btn-ignite');
+        const btnIgniteText = document.getElementById('btn-ignite-text');
+        const btnPuff = document.getElementById('btn-puff');
+        const btnMic = document.getElementById('btn-mic');
+        const btnMicText = document.getElementById('btn-mic-text');
+        const btnReset = document.getElementById('btn-reset');
+        const btnToggleSound = document.getElementById('btn-toggle-sound');
+        const micStatusDot = document.getElementById('mic-status-dot');
+        const micStatusText = document.getElementById('mic-status-text');
+        const instructionText = document.getElementById('instruction-text');
+        const puffCountEl = document.getElementById('puff-count');
+        const lengthValEl = document.getElementById('length-val');
+        const stateValEl = document.getElementById('state-val');
+        
+        const cigaretteSvg = document.getElementById('cigarette-svg');
+        const paperRect = document.getElementById('paper-rect');
+        const tipGroup = document.getElementById('tip-group');
+        const coalPath = document.getElementById('coal-path');
+        const ashPath = document.getElementById('ash-path');
+        const container = document.getElementById('cigarette-container');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        let particles = [];
+
+        class SmokeParticle {
+            constructor(x, y, isExhale = false) {
+                this.x = x;
+                this.y = y;
+                this.isExhale = isExhale;
+                
+                if (isExhale) {
+                    this.x = canvas.width / 2 + (Math.random() - 0.5) * 100;
+                    this.y = canvas.height * 0.75;
+                    this.vx = (Math.random() - 0.5) * 3;
+                    this.vy = -Math.random() * 3 - 1.5;
+                    this.radius = Math.random() * 25 + 15;
+                    this.alpha = Math.random() * 0.25 + 0.1;
+                    this.growth = Math.random() * 0.8 + 0.4;
+                } else {
+                    this.vx = (Math.random() - 0.5) * 0.8 - 0.5;
+                    this.vy = -Math.random() * 1.5 - 0.8;
+                    this.radius = Math.random() * 8 + 4;
+                    this.alpha = Math.random() * 0.35 + 0.15;
+                    this.growth = Math.random() * 0.3 + 0.15;
+                }
+                
+                this.maxAlpha = this.alpha;
+                this.life = 0;
+                this.maxLife = Math.random() * 120 + 80;
+                this.wobble = Math.random() * Math.PI * 2;
+                this.wobbleSpeed = Math.random() * 0.05 + 0.02;
+            }
+
+            update() {
+                this.life++;
+                this.wobble += this.wobbleSpeed;
+                this.x += this.vx + Math.sin(this.wobble) * 0.6;
+                this.y += this.vy;
+                this.radius += this.growth;
+                
+                if (this.life > this.maxLife * 0.7) {
+                    this.alpha = this.maxAlpha * (1 - (this.life - this.maxLife * 0.7) / (this.maxLife * 0.3));
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.beginPath();
+                const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius);
+                gradient.addColorStop(0, `rgba(240, 245, 255, ${Math.max(0, this.alpha)})`);
+                gradient.addColorStop(0.5, `rgba(210, 220, 235, ${Math.max(0, this.alpha * 0.6)})`);
+                gradient.addColorStop(1, 'rgba(200, 210, 225, 0)');
+                
+                ctx.fillStyle = gradient;
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function getCoalCoordinates() {
+            const rect = cigaretteSvg.getBoundingClientRect();
+            const scaleX = rect.width / 600;
+            const baseSvgX = 180 + (340 * (cigaretteLength / 100));
+            const screenX = rect.left + (baseSvgX + 40) * scaleX;
+            const screenY = rect.top + rect.height * 0.52;
+            return { x: screenX, y: screenY };
+        }
+
+        function playBurnSound(intensity = 0.05) {
+            if (!soundEnabled) return;
+            try {
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+                
+                const bufferSize = audioContext.sampleRate * 0.5;
+                const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+
+                const noise = audioContext.createBufferSource();
+                noise.buffer = buffer;
+
+                const filter = audioContext.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = 400;
+                filter.Q.value = 3;
+
+                const gainNode = audioContext.createGain();
+                gainNode.gain.setValueAtTime(intensity, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.4);
+
+                noise.connect(filter);
+                filter.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                noise.start();
+            } catch (e) {
+                console.log("Audio non autorisé ou indisponible", e);
+            }
+        }
+
+        async function toggleMicrophone() {
+            const t = translations[currentLang];
+            if (micActive) {
+                stopMicrophone();
+            } else {
+                try {
+                    microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                    if (!audioContext) {
+                        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    }
+                    const source = audioContext.createMediaStreamSource(microphoneStream);
+                    analyser = audioContext.createAnalyser();
+                    analyser.fftSize = 256;
+                    source.connect(analyser);
+
+                    micActive = true;
+                    btnMicText.textContent = t.btnMicStop;
+                    btnMic.classList.add('bg-emerald-600', 'border-emerald-500');
+                    micStatusDot.classList.remove('bg-emerald-500');
+                    micStatusDot.classList.add('bg-red-500');
+                    micStatusText.textContent = t.micActiveText;
+                    
+                    monitorMicrophone();
+                } catch (err) {
+                    alert(currentLang === 'fr' ? "Impossible d'accéder au microphone." : "Unable to access microphone.");
+                    console.error(err);
+                }
+            }
+        }
+
+        function stopMicrophone() {
+            const t = translations[currentLang];
+            if (microphoneStream) {
+                microphoneStream.getTracks().forEach(track => track.stop());
+                microphoneStream = null;
+            }
+            micActive = false;
+            btnMicText.textContent = t.btnMic;
+            btnMic.classList.remove('bg-emerald-600', 'border-emerald-500');
+            micStatusDot.classList.remove('bg-red-500');
+            micStatusDot.classList.add('bg-emerald-500');
+            micStatusText.textContent = t.micInactive;
+        }
+
+        function monitorMicrophone() {
+            if (!micActive || !analyser) return;
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(dataArray);
+
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+            }
+            let average = sum / dataArray.length;
+
+            if (average > 35 && isLit && cigaretteLength > 0) {
+                triggerPuff(true);
+            }
+
+            requestAnimationFrame(monitorMicrophone);
+        }
+
+        function igniteCigarette() {
+            const t = translations[currentLang];
+            if (cigaretteLength <= 0) return;
+            isLit = !isLit;
+            
+            if (isLit) {
+                btnIgniteText.textContent = t.btnExtinguish;
+                btnIgnite.classList.remove('from-orange-500', 'to-red-600');
+                btnIgnite.classList.add('from-slate-700', 'to-slate-800');
+                btnPuff.disabled = false;
+                stateValEl.textContent = t.stateOn;
+                stateValEl.className = "text-xl font-bold text-orange-400 animate-pulse";
+                coalPath.style.opacity = "1";
+                container.classList.add('glow-red');
+                instructionText.textContent = t.instructionOn;
+                playBurnSound(0.08);
+            } else {
+                btnIgniteText.textContent = t.btnIgnite;
+                btnIgnite.classList.add('from-orange-500', 'to-red-600');
+                btnIgnite.classList.remove('from-slate-700', 'to-slate-800');
+                btnPuff.disabled = true;
+                stateValEl.textContent = t.stateOff;
+                stateValEl.className = "text-xl font-bold text-slate-400";
+                coalPath.style.opacity = "0.3";
+                container.classList.remove('glow-red');
+                instructionText.textContent = t.instructionOff;
+            }
+        }
+
+        function triggerPuff(isFromBlow = false) {
+            const t = translations[currentLang];
+            if (!isLit || isPuffing || cigaretteLength <= 0) return;
+            isPuffing = true;
+            
+            puffCount++;
+            puffCountEl.textContent = puffCount;
+            
+            cigaretteLength = Math.max(0, cigaretteLength - 5);
+            lengthValEl.textContent = cigaretteLength + "%";
+            updateCigaretteVisuals();
+
+            playBurnSound(0.15);
+
+            coalPath.style.fill = "#fbbf24";
+            container.classList.add('glow-orange');
+
+            setTimeout(() => {
+                const count = isFromBlow ? 35 : 20;
+                for (let i = 0; i < count; i++) {
+                    particles.push(new SmokeParticle(0, 0, true));
+                }
+            }, 300);
+
+            setTimeout(() => {
+                coalPath.style.fill = "#ef4444";
+                container.classList.remove('glow-orange');
+                isPuffing = false;
+                
+                if (cigaretteLength <= 0) {
+                    isLit = false;
+                    stateValEl.textContent = t.stateDone;
+                    stateValEl.className = "text-xl font-bold text-slate-500";
+                    btnPuff.disabled = true;
+                    btnIgnite.disabled = true;
+                    coalPath.style.opacity = "0";
+                    container.classList.remove('glow-red');
+                    instructionText.textContent = t.instructionDone;
+                }
+            }, 800);
+        }
+
+        function updateCigaretteVisuals() {
+            const remainingWidth = 340 * (cigaretteLength / 100);
+            paperRect.setAttribute('width', remainingWidth);
+            const newX = 180 + remainingWidth;
+            tipGroup.setAttribute('transform', `translate(${newX}, 35)`);
+        }
+
+        function resetSimulation() {
+            const t = translations[currentLang];
+            isLit = false;
+            cigaretteLength = 100;
+            puffCount = 0;
+            puffCountEl.textContent = '0';
+            lengthValEl.textContent = '100%';
+            stateValEl.textContent = t.stateOff;
+            stateValEl.className = 'text-xl font-bold text-red-400';
+            btnIgniteText.textContent = t.btnIgnite;
+            btnIgnite.disabled = false;
+            btnIgnite.classList.remove('from-slate-700', 'to-slate-800');
+            btnIgnite.classList.add('from-orange-500', 'to-red-600');
+            btnPuff.disabled = true;
+            coalPath.style.opacity = '0.3';
+            coalPath.style.fill = '#ef4444';
+            container.classList.remove('glow-red', 'glow-orange');
+            instructionText.textContent = t.instructionOff;
+            particles = [];
+            updateCigaretteVisuals();
+            if (micActive) stopMicrophone();
+        }
+
+        let passiveTimer = 0;
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (isLit) {
+                passiveTimer++;
+                if (passiveTimer % 15 === 0) {
+                    const coords = getCoalCoordinates();
+                    particles.push(new SmokeParticle(coords.x, coords.y, false));
+                }
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.update();
+                p.draw();
+                if (p.life >= p.maxLife || p.alpha <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        btnIgnite.addEventListener('click', igniteCigarette);
+        btnPuff.addEventListener('click', () => triggerPuff(false));
+        btnMic.addEventListener('click', toggleMicrophone);
+        btnReset.addEventListener('click', resetSimulation);
+        
+        container.addEventListener('click', () => {
+            if (!isLit) {
+                igniteCigarette();
+            } else {
+                triggerPuff(false);
+            }
+        });
+
+        btnToggleSound.addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            btnToggleSound.textContent = soundEnabled ? '🔊' : '🔇';
+        });
+
+        window.onload = function() {
+            animate();
+        };
+    </script>
+</body>
+</html>
